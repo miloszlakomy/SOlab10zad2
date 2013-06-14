@@ -19,29 +19,6 @@ void interrupt(int signo)
         exit(0);
 }
 
-enum TypeEnum{
-  UNIX,
-  INET
-};
-
-struct MySockaddr{
-  enum TypeEnum type;
-  union {
-    struct sockaddr_un val_un;
-    struct sockaddr_in val_in;
-  };
-  
-  MySockaddr(struct sockaddr_un val)
-  :val_un(val) {
-    type = UNIX;
-  };
-  
-  MySockaddr(struct sockaddr_in val)
-  :val_in(val) {
-    type = INET;
-  };
-};
-
 const int stdinFD = 0;
 
 const string bialeZnaki = " \t\n\v\f\r";
