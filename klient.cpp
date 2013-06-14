@@ -83,8 +83,8 @@ int main(int argc, char ** argv){
   identyfikatorKlienta[dlugoscNazwyDomeny] = '.';
   if(-1 == getdomainname(identyfikatorKlienta + dlugoscNazwyDomeny + 1, (MAX_MSG_SIZE-3)/2)) sysError("getdomainname error");
   
-//   identyfikatorKlienta[0] = getchar();
-//   getchar();
+  identyfikatorKlienta[0] = getchar();
+  getchar();
   
 //   struct sockaddr * adresSocketuSerwera;
 //   socklen_t rozmiarStrukturyAdresu;

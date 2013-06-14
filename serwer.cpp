@@ -41,10 +41,11 @@ void clean()
 }
 
 pair<pthread_mutex_t, map<int, pthread_mutex_t> > mutexyPerKlient;
+pair<pthread_mutex_t, map<int, pthread_mutex_t> > mutexyPerKlientCzyPolecenieZostaloWykonane;
 pair<pthread_mutex_t, map<string, int> > klienci;
 pair<pthread_mutex_t, map<int, bool> > dostepnoscSocketuPerKlient;
 pair<pthread_mutex_t, map<int, queue<pair<string, int> > > > kolejkaPolecenINadawcowPerKlient;
-pair<pthread_mutex_t, map<int, string> > wynikPoleceniaPerKlient;
+pair<pthread_mutex_t, string> wynikPolecenia;
 
 void * watekPerKlient(void* _arg){
   
@@ -56,12 +57,15 @@ void * watekPerKlient(void* _arg){
   int deskryptorSocketuPerKlient = *(int *)_arg;
   
   pthread_mutex_t * adresMutexuPerKlient;
+  pthread_mutex_t * adresMutexuPerKlientCzyPolecenieZostaloWykonane;
   
-  pthread_mutex_lock(&mutexyPerKlient.first);
-  {
+  pthread_mutex_lock(&mutexyPerKlient.first); {
     adresMutexuPerKlient = &mutexyPerKlient.second[deskryptorSocketuPerKlient];
-  }
-  pthread_mutex_unlock(&mutexyPerKlient.first);
+  } pthread_mutex_unlock(&mutexyPerKlient.first);
+  
+  pthread_mutex_lock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first); {
+    adresMutexuPerKlientCzyPolecenieZostaloWykonane = &mutexyPerKlientCzyPolecenieZostaloWykonane.second[deskryptorSocketuPerKlient];
+  } pthread_mutex_unlock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first);
   
   if(recv(deskryptorSocketuPerKlient, &buf, MAX_MSG_SIZE, 0) == -1) sysError("recv error");
   
@@ -87,10 +91,6 @@ void * watekPerKlient(void* _arg){
   pthread_mutex_unlock(&klienci.first);
   
   if((unsigned)message.size()+1 != send(deskryptorSocketuPerKlient, message.c_str(), message.size()+1, 0)) sysError("sendto error");
-  
-  pthread_mutex_lock(&wynikPoleceniaPerKlient.first); {
-    wynikPoleceniaPerKlient.second[deskryptorSocketuPerKlient] = "";
-  } pthread_mutex_unlock(&wynikPoleceniaPerKlient.first);
   
   for(;;){
     
@@ -126,65 +126,51 @@ void * watekPerKlient(void* _arg){
         if((unsigned)message.size()+1 != send(deskryptorSocketuPerKlient, message.c_str(), message.size()+1, 0)) sysError("send error");
       }
       else if('2' == buf[0]){ // polecenie
-        NYI
-  //     
-  //     string message;
-  //     bool zepsutePolaczenie = false;
-  //     
-  //     string dummy = &buf[2];
-  //     int indeksPierwszegoBialegoZnaku = dummy.find_first_of(bialeZnaki);
-  //     if(string::npos == indeksPierwszegoBialegoZnaku)
-  //       message = "Nieprawidlowy format wiadomosci.";
-  //     else{
-  //       string identyfikatorKlientaKtoryMaWykonacPolecenie = dummy.substr(0, indeksPierwszegoBialegoZnaku);
-  //       string polecenie = "8 " + dummy.substr(indeksPierwszegoBialegoZnaku+1);
-  //       
-  //       if(klienci.end() != klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)){
-  //         
-  //         if(UNIX == klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.type){
-  //           
-  // //             cout << endl << "!!!" << endl << (AF_UNIX == klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.val_un.sun_family) << endl << klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.val_un.sun_path << endl << "!!!" << endl;
-  //           
-  //           if((unsigned)polecenie.size()+1 != sendto(deskryptorSocketuAkceptoraLokalnego, polecenie.c_str(), polecenie.size()+1, 0, (const struct sockaddr *) &klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.val_un, sizeof(struct sockaddr_un))) sysError("sendto error");
-  //         }
-  //         else{
-  //           if((unsigned)polecenie.size()+1 != sendto(deskryptorSocketuAkceptoraZdalnego, polecenie.c_str(), polecenie.size()+1, 0, (const struct sockaddr *) &klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.val_in, sizeof(struct sockaddr_in))) sysError("sendto error");
-  //         }
-  //         
-  //         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv_piecSekund,sizeof(struct timeval));
-  //         
-  //         errno = 0;
-  //         if(-1 == recv(
-  //           (UNIX == klienci.find(identyfikatorKlientaKtoryMaWykonacPolecenie)->second.type) ?
-  //           deskryptorSocketuAkceptoraLokalnego :
-  //           deskryptorSocketuAkceptoraZdalnego
-  //           , (void *) &buforNaWynikiPolecen, MAX_MSG_SIZE, 0)){
-  //           if(EINTR == errno || EWOULDBLOCK == errno){
-  //             zepsutePolaczenie = true;
-  //             klienci.erase(identyfikatorKlientaKtoryMaWykonacPolecenie);
-  //           }
-  //           else
-  //             sysError("recv error");
-  //         }
-  //         
-  //         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv_zero,sizeof(struct timeval));
-  //         
-  //         if(!zepsutePolaczenie){
-  //           if(' ' != buforNaWynikiPolecen[1] || '7' != buforNaWynikiPolecen[0]) sysError("Bledny format otrzymanej wiadomosci.");
-  //           
-  //           message = buforNaWynikiPolecen;
-  //         }
-  //       }
-  //       else{
-  //         message = "E Ten klient nie jest zalogowany.";
-  //       }
-  //       
-  //     }
-  //     
-  //     if(!zepsutePolaczenie &&
-  //        (unsigned)message.size()+1 != sendto(fd, message.c_str(), message.size()+1, 0, 
-  //                                             ((fd == deskryptorSocketuAkceptoraLokalnego) ? (const struct sockaddr *) &adresSocketuLokalnego : (const struct sockaddr *) &adresSocketuZdalnego),
-  //                                             addrlen)) sysError("sendto error");
+        
+        string message;
+        
+        string dummy = &buf[2];
+        int indeksPierwszegoBialegoZnaku = dummy.find_first_of(bialeZnaki);
+        if(string::npos == indeksPierwszegoBialegoZnaku)
+          message = "E Nieprawidlowy format wiadomosci.";
+        else{
+          string identyfikatorKlientaKtoryMaWykonacPolecenie = dummy.substr(0, indeksPierwszegoBialegoZnaku);
+          string polecenie = "8 " + dummy.substr(indeksPierwszegoBialegoZnaku+1);
+          
+          int deskryptorKlientaKtoryMaWykonacPolecenie;
+          
+          pthread_mutex_lock(&klienci.first); {
+            map<string, int>::iterator it = klienci.second.find(identyfikatorKlientaKtoryMaWykonacPolecenie);
+            deskryptorKlientaKtoryMaWykonacPolecenie =
+              (klienci.second.end() == it) ?
+              -1 :
+              it->second ;
+          } pthread_mutex_unlock(&klienci.first);
+          
+          if(-1 != deskryptorKlientaKtoryMaWykonacPolecenie){
+            
+            pthread_mutex_lock(&kolejkaPolecenINadawcowPerKlient.first); {
+              kolejkaPolecenINadawcowPerKlient.second[deskryptorKlientaKtoryMaWykonacPolecenie].push(make_pair(polecenie, deskryptorSocketuPerKlient));
+            } pthread_mutex_unlock(&kolejkaPolecenINadawcowPerKlient.first);
+            
+            pthread_mutex_lock(&mutexyPerKlient.first); {
+              pthread_mutex_unlock(&mutexyPerKlient.second[deskryptorKlientaKtoryMaWykonacPolecenie]);
+            } pthread_mutex_unlock(&mutexyPerKlient.first);
+            
+            
+            pthread_mutex_lock(adresMutexuPerKlientCzyPolecenieZostaloWykonane);
+            
+            message = wynikPolecenia.second;
+            pthread_mutex_unlock(&wynikPolecenia.first);
+            
+          }
+          else{
+            message = "E Ten klient nie jest zalogowany.";
+          }
+          
+        }
+        
+        if((unsigned)message.size()+1 != send(deskryptorSocketuPerKlient, message.c_str(), message.size()+1, 0)) sysError("send error");
       }
       else if('3' == buf[0]){ // wylogowanie
         
@@ -207,6 +193,10 @@ void * watekPerKlient(void* _arg){
           mutexyPerKlient.second.erase(deskryptorSocketuPerKlient);
         } pthread_mutex_unlock(&mutexyPerKlient.first);
         
+        pthread_mutex_lock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first); {
+          mutexyPerKlientCzyPolecenieZostaloWykonane.second.erase(deskryptorSocketuPerKlient);
+        } pthread_mutex_unlock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first);
+        
         pthread_mutex_lock(&dostepnoscSocketuPerKlient.first); {
           dostepnoscSocketuPerKlient.second.erase(deskryptorSocketuPerKlient);
         } pthread_mutex_unlock(&dostepnoscSocketuPerKlient.first);
@@ -214,10 +204,6 @@ void * watekPerKlient(void* _arg){
         pthread_mutex_lock(&kolejkaPolecenINadawcowPerKlient.first); {
           kolejkaPolecenINadawcowPerKlient.second.erase(deskryptorSocketuPerKlient);
         } pthread_mutex_unlock(&kolejkaPolecenINadawcowPerKlient.first);
-        
-        pthread_mutex_lock(&wynikPoleceniaPerKlient.first); {
-          wynikPoleceniaPerKlient.second.erase(deskryptorSocketuPerKlient);
-        } pthread_mutex_unlock(&wynikPoleceniaPerKlient.first);
         
         cout << deskryptorSocketuPerKlient << ": Wylogowany." << endl;
         
@@ -229,17 +215,30 @@ void * watekPerKlient(void* _arg){
     
     pair<string, int> polecenieINadawca = make_pair("", -1);
     
-    pthread_mutex_lock(&kolejkaPolecenINadawcowPerKlient.first);
-    {
+    pthread_mutex_lock(&kolejkaPolecenINadawcowPerKlient.first); {
       if(kolejkaPolecenINadawcowPerKlient.second[deskryptorSocketuPerKlient].size()){
         polecenieINadawca = kolejkaPolecenINadawcowPerKlient.second[deskryptorSocketuPerKlient].front();
         kolejkaPolecenINadawcowPerKlient.second[deskryptorSocketuPerKlient].pop();
       }
-    }
-    pthread_mutex_unlock(&kolejkaPolecenINadawcowPerKlient.first);
+    } pthread_mutex_unlock(&kolejkaPolecenINadawcowPerKlient.first);
     
     if(-1 != polecenieINadawca.second){
-      NYI
+      
+      
+      if((unsigned)polecenieINadawca.first.size()+1 != send(deskryptorSocketuPerKlient, polecenieINadawca.first.c_str(), polecenieINadawca.first.size()+1, 0)) sysError("send error");
+      
+      if(-1 == recv(deskryptorSocketuPerKlient, (void *) &buforNaWynikiPolecen, MAX_MSG_SIZE, 0)) sysError("recv error");
+      
+      if(' ' != buforNaWynikiPolecen[1] || '7' != buforNaWynikiPolecen[0]) sysError("Bledny format otrzymanej wiadomosci.");
+      
+      pthread_mutex_lock(&wynikPolecenia.first);
+      
+      wynikPolecenia.second = buforNaWynikiPolecen;
+      
+      pthread_mutex_lock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first); {
+        pthread_mutex_unlock(&mutexyPerKlientCzyPolecenieZostaloWykonane.second[polecenieINadawca.second]);
+      } pthread_mutex_unlock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first);
+      
     }
   }
   
@@ -302,10 +301,12 @@ int main(int argc, char ** argv){
   
   if(pthread_mutex_init(&deskryptorySocketowPerKlient.first, NULL)) sysError("pthread_mutex_init error");
   if(pthread_mutex_init(&mutexyPerKlient.first, NULL)) sysError("pthread_mutex_init error");
+  if(pthread_mutex_init(&mutexyPerKlientCzyPolecenieZostaloWykonane.first, NULL)) sysError("pthread_mutex_init error");
   if(pthread_mutex_init(&klienci.first, NULL)) sysError("pthread_mutex_init error");
   if(pthread_mutex_init(&dostepnoscSocketuPerKlient.first, NULL)) sysError("pthread_mutex_init error");
   if(pthread_mutex_init(&kolejkaPolecenINadawcowPerKlient.first, NULL)) sysError("pthread_mutex_init error");
-  if(pthread_mutex_init(&wynikPoleceniaPerKlient.first, NULL)) sysError("pthread_mutex_init error");
+  if(pthread_mutex_init(&wynikPolecenia.first, NULL)) sysError("pthread_mutex_init error");
+  wynikPolecenia.second = "";
   
   
   
@@ -353,12 +354,15 @@ int main(int argc, char ** argv){
         } pthread_mutex_unlock(&deskryptorySocketowPerKlient.first);
         
         
-        pthread_mutex_lock(&mutexyPerKlient.first);
-        {
+        pthread_mutex_lock(&mutexyPerKlient.first); {
           if(pthread_mutex_init(&mutexyPerKlient.second[nowyDeskryptorSocketuKlienta], NULL)) sysError("pthread_mutex_init error");
           pthread_mutex_lock(&mutexyPerKlient.second[nowyDeskryptorSocketuKlienta]);
-        }
-        pthread_mutex_unlock(&mutexyPerKlient.first);
+        } pthread_mutex_unlock(&mutexyPerKlient.first);
+        
+        pthread_mutex_lock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first); {
+          if(pthread_mutex_init(&mutexyPerKlientCzyPolecenieZostaloWykonane.second[nowyDeskryptorSocketuKlienta], NULL)) sysError("pthread_mutex_init error");
+          pthread_mutex_lock(&mutexyPerKlientCzyPolecenieZostaloWykonane.second[nowyDeskryptorSocketuKlienta]);
+        } pthread_mutex_unlock(&mutexyPerKlientCzyPolecenieZostaloWykonane.first);
         
         
         pthread_mutex_lock(&dostepnoscSocketuPerKlient.first); {
@@ -380,7 +384,9 @@ int main(int argc, char ** argv){
         }
         pthread_mutex_unlock(&dostepnoscSocketuPerKlient.first);
         
-        pthread_mutex_unlock(&mutexyPerKlient.second[fd]);
+        pthread_mutex_lock(&mutexyPerKlient.first); {
+          pthread_mutex_unlock(&mutexyPerKlient.second[fd]);
+        } pthread_mutex_unlock(&mutexyPerKlient.first);
         
       }
     }
